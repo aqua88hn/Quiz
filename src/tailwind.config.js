@@ -9,7 +9,20 @@ module.exports = {
   ],
   darkMode: 'class',
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        slate: {
+          950: "var(--slate-950)",
+          900: "var(--slate-900)",
+          800: "var(--slate-800)"
+        },
+        primary: "var(--color-primary)",
+        secondary: "var(--color-secondary)"
+      },
+      spacing: {
+        7.5: "1.875rem"
+      }
+    },
   },
   plugins: [
     // Uncomment any plugins you want and install them as devDependencies
