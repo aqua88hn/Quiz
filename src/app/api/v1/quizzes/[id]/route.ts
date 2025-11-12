@@ -1,25 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getQuizById, getQuestionsByQuizId } from "@/lib/db"
+import { asyncWrapper } from "@/lib/middleware/asyncWrapper"
+import type { RequestContext } from "@/lib/middleware/types"
+import { NotFoundError } from "@/lib/middleware/types"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const { id } = params
-    const quiz = getQuizById(id)
+async function GET(request: NextRequest, ctx: RequestContext & { params: { id: string } }) {
+  const { id } = ctx.params
+  const quiz = getQuizById(id)
 
-    if (!quiz) {
-      return NextResponse.json({ success: false, error: "Quiz not found" }, { status: 404 })
-    }
-
-    const questions = getQuestionsByQuizId(id)
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...quiz,
-        questions,
-      },
-    })
-  } catch (error) {
-    return NextResponse.json({ success: false, error: "Failed to fetch quiz" }, { status: 500 })
+  if (!quiz) {
+    throw new NotFoundError("Quiz not found")
   }
+
+  const questions = getQuestionsByQuizId(id)
+
+  return NextResponse.json({
+    success: true,
+    requestId: ctx.requestId,
+    data: {
+      ...quiz,
+      questions,
+    },
+  })
 }
+
+export default asyncWrapper(GET as any)

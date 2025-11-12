@@ -1,25 +1,32 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateToken, validateAdminPassword } from "@/lib/auth"
+import { asyncWrapper } from "@/lib/middleware/asyncWrapper"
+import type { RequestContext } from "@/lib/middleware/types"
+import { ValidationError, AuthError } from "@/lib/middleware/types"
+import { logAuditAction } from "@/lib/middleware/requestLogger"
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { password } = body
+async function POST(request: NextRequest, ctx: RequestContext) {
+  const body = await request.json()
+  const { password } = body
 
-    if (!password) {
-      return NextResponse.json({ success: false, error: "Password required" }, { status: 400 })
-    }
-
-    if (!validateAdminPassword(password)) {
-      return NextResponse.json({ success: false, error: "Invalid password" }, { status: 401 })
-    }
-
-    const token = generateToken("admin")
-    return NextResponse.json({
-      success: true,
-      data: { token },
-    })
-  } catch (error) {
-    return NextResponse.json({ success: false, error: "Login failed" }, { status: 500 })
+  if (!password) {
+    throw new ValidationError("Password required", { field: "password" })
   }
+
+  if (!validateAdminPassword(password)) {
+    logAuditAction(ctx.requestId, "unknown", "CREATE", "auth_session", "login", "FAILED")
+    throw new AuthError("Invalid password")
+  }
+
+  const token = generateToken("admin")
+
+  logAuditAction(ctx.requestId, "admin", "CREATE", "auth_session", "login", "SUCCESS")
+
+  return NextResponse.json({
+    success: true,
+    requestId: ctx.requestId,
+    data: { token },
+  })
 }
+
+export default asyncWrapper(POST)

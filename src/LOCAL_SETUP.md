@@ -35,7 +35,7 @@ cd quizmate
 rm -rf node_modules package-lock.json
 npm cache clean --force
 
-# Cài tải lại dêpndencies
+# Cài tải lại dependencies
 npm install
 ```
 
