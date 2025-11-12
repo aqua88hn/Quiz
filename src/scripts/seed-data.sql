@@ -1,8 +1,42 @@
+
+-- Insert default permissions
+INSERT INTO permissions (permission_name, description) VALUES
+  ('view_quizzes', 'View quiz list'),
+  ('take_quiz', 'Take quiz'),
+  ('view_results', 'View quiz results'),
+  ('manage_quizzes', 'Create, edit, delete quizzes'),
+  ('manage_questions', 'Manage quiz questions'),
+  ('manage_users', 'Manage users and permissions'),
+  ('view_analytics', 'View analytics and metrics'),
+  ('manage_audit_logs', 'View and manage audit logs')
+ON CONFLICT DO NOTHING;
+
+-- Insert role permissions
+INSERT INTO role_permissions (role, permission_id) 
+SELECT 'admin', id FROM permissions ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role, permission_id) 
+SELECT 'user', id FROM permissions WHERE permission_name IN ('view_quizzes', 'take_quiz', 'view_results')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role, permission_id) 
+SELECT 'moderator', id FROM permissions WHERE permission_name IN ('view_quizzes', 'take_quiz', 'view_results', 'manage_quizzes', 'manage_questions')
+ON CONFLICT DO NOTHING;
+
+-- Seed default admin user (password: admin123 hashed)
+
+-- Password: admin123
+-- Hash generated with bcrypt, cost 10
+INSERT INTO users (username, email, password_hash, role, status) 
+VALUES 
+  ('admin', 'admin@quizmate.local', '$2b$10$d9ZH2lnVZb/jtLNIB/dO0.ue7TP4nYNXBOO3F5LOu8rLr9KNH3IIa', 'admin', 'active'),
+  ('demo_user', 'demo@quizmate.local', '$2b$10$d9ZH2lnVZb/jtLNIB/dO0.ue7TP4nYNXBOO3F5LOu8rLr9KNH3IIa', 'user', 'active')
+ON CONFLICT DO NOTHING;
+
 -- Insert Quizzes
 INSERT INTO quizzes (id, title, description, question_count, difficulty) VALUES
 ('python_keywords_expert', 'Python Keywords Expert', 'Advanced questions on Python reserved keywords', 5, 'Expert'),
 ('python_basics', 'Python Basics', 'Fundamental concepts of Python programming', 5, 'Beginner');
-
 -- Insert Questions for python_keywords_expert
 INSERT INTO questions (id, quiz_id, question, options, answer, explanation, type) VALUES
 (

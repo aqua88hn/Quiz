@@ -1,32 +1,36 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateToken, validateAdminPassword } from "@/lib/auth"
+import { validateUserLogin, generateToken } from "@/lib/auth-postgres"
 import { asyncWrapper } from "@/lib/middleware/asyncWrapper"
 import type { RequestContext } from "@/lib/middleware/types"
 import { ValidationError, AuthError } from "@/lib/middleware/types"
-import { logAuditAction } from "@/lib/middleware/requestLogger"
+import { createAuditLog } from "@/lib/db-users"
 
-async function POST(request: NextRequest, ctx: RequestContext) {
-  const body = await request.json()
-  const { password } = body
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+    const { username, password } = body || {}
 
-  if (!password) {
-    throw new ValidationError("Password required", { field: "password" })
+    if (!username || !password) {
+      return new Response(JSON.stringify({ error: "Missing username or password" }), { status: 400 })
+    }
+
+    const user = await validateUserLogin(username, password)
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401 })
+    }
+
+    const token = generateToken(user.id, user.username, user.role)
+    return new Response(JSON.stringify({ token, user: { id: user.id, username: user.username, role: user.role } }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  } catch (err) {
+    console.error("Login route error:", err)
+    return new Response(JSON.stringify({ error: "Internal server error" }), { status: 500 })
   }
-
-  if (!validateAdminPassword(password)) {
-    logAuditAction(ctx.requestId, "unknown", "CREATE", "auth_session", "login", "FAILED")
-    throw new AuthError("Invalid password")
-  }
-
-  const token = generateToken("admin")
-
-  logAuditAction(ctx.requestId, "admin", "CREATE", "auth_session", "login", "SUCCESS")
-
-  return NextResponse.json({
-    success: true,
-    requestId: ctx.requestId,
-    data: { token },
-  })
 }
 
-export default asyncWrapper(POST)
+// Nếu cần hỗ trợ GET (ví dụ health), export thêm:
+export async function GET() {
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } })
+}

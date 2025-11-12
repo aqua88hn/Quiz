@@ -30,12 +30,6 @@ cd quizmate
 
 ### Bước 2: Cài Dependencies
 ```bash
-
-# Xóa cache và thư mục cũ nếu cần
-rm -rf node_modules package-lock.json
-npm cache clean --force
-
-# Cài tải lại dependencies
 npm install
 ```
 
