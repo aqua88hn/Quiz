@@ -1,4 +1,4 @@
-import { getUserByUsername, createAuditLog } from "./db-users"
+import { getUserByUsername, createAuditLog, updateUserLastLogin } from "./db-users"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production"
 
@@ -23,19 +23,35 @@ export async function verifyPassword(plainPassword: string, passwordHash: string
 }
 
 export async function validateUserLogin(username: string, password: string) {
-  const user = await getUserByUsername(username)
+   const user = await getUserByUsername(username)
 
-  if (!user || user.status !== "active") {
+  // If user not found, log an audit attempt (resourceId null)
+  if (!user) {
+    try {
+      const a = await createAuditLog(null, "LOGIN_FAILED", "user", null, { username, reason: "not_found" })
+      if (!a.ok) console.warn("[AUTH] audit log failed:", a.error ?? a)
+    } catch (e) {
+      console.warn("[AUTH] audit create failed unexpectedly:", e)
+    }
+    return null
+  }
+
+  if (user.status !== "active") {
+    await createAuditLog(user.id, "LOGIN_FAILED", "user", user.id, { username, reason: "disabled_or_inactive" })
     return null
   }
 
   const isValidPassword = await verifyPassword(password, user.password_hash)
 
   if (!isValidPassword) {
-    await createAuditLog(null, "LOGIN_FAILED", "user", user.id, { reason: "invalid_password" })
+    const a = await createAuditLog(user.id, "LOGIN_FAILED", "user", user.id, { reason: "invalid_password" })
+    if (!a.ok) console.warn("[AUTH] audit log failed:", a.error ?? a)
     return null
   }
 
+  // successful login
+  await createAuditLog(user.id, "LOGIN_SUCCESS", "user", user.id, { username })
+  await updateUserLastLogin(user.id)
   return user
 }
 
@@ -64,3 +80,5 @@ export function verifyToken(token: string): AuthPayload | null {
     return null
   }
 }
+
+export * from "@/lib/auth-postgres"

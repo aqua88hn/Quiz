@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { verifyToken } from "@/lib/auth"
+import { verifyToken } from "@/lib/auth-postgres"
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname

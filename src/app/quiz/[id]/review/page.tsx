@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 
@@ -8,7 +8,7 @@ interface Question {
   id: string
   question: string
   options: string[]
-  explanation: string
+  explanation?: string
 }
 
 interface SubmitAnswer {
@@ -16,66 +16,77 @@ interface SubmitAnswer {
   selected: number[]
 }
 
+interface SubmitDetail {
+  questionId: string
+  correct: boolean
+  correctOptions: number[]
+  explanation?: string | null
+}
+
 export default function ReviewPage() {
   const params = useParams()
   const quizId = params.id as string
+
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<SubmitAnswer[]>([])
-  const [correctAnswers] = useState<{ [key: string]: number[] }>({
-    q1: [1],
-    q2: [0],
-    q3: [1],
-    q4: [0, 1],
-    q5: [1],
-  })
+  const [details, setDetails] = useState<SubmitDetail[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Mock questions
-    const mockQuestions: Question[] = [
-      {
-        id: "q1",
-        question: "Từ khóa nào dùng để định nghĩa một hàm trong Python?",
-        options: ["function", "def", "lambda", "define"],
-        explanation: 'Từ khóa "def" được sử dụng để định nghĩa một hàm trong Python.',
-      },
-      {
-        id: "q2",
-        question: "Từ khóa nào dùng để tạo một hàm bất động bộ?",
-        options: ["async", "await", "def", "thread"],
-        explanation: 'Từ khóa "async" được sử dụng để định nghĩa một hàm bất động bộ trong Python.',
-      },
-      {
-        id: "q3",
-        question: 'Từ khóa "yield" thường được dùng trong loại hàm nào?',
-        options: ["Hàm bình thường", "Generator", "Hàm lambda", "Async function"],
-        explanation: '"yield" được sử dụng trong các hàm generator để trả về các giá trị một lần một.',
-      },
-      {
-        id: "q4",
-        question: "Cách nào để tạo một hàm với số lượng đối số không xác định?",
-        options: ["*args", "**kwargs", "Cả hai *args và **kwargs", "Không thể làm được"],
-        explanation: "Cả *args và **kwargs đều có thể được sử dụng để tạo hàm với số lượng đối số không xác định.",
-      },
-      {
-        id: "q5",
-        question: "Từ khóa nào dùng để xử lý ngoại lệ trong Python?",
-        options: ["try-catch", "try-except", "error-handle", "handle-error"],
-        explanation: 'Từ khóa "try-except" được sử dụng để xử lý ngoại lệ trong Python.',
-      },
-    ]
+    async function load() {
+      try {
+        setLoading(true)
+        setError(null)
 
-    setQuestions(mockQuestions)
+        // 1) lấy câu hỏi từ API (để hiển thị nội dung + options)
+        const resQuiz = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}`)
+        const jsonQuiz = await resQuiz.json()
+        if (!resQuiz.ok || !jsonQuiz?.success) throw new Error(jsonQuiz?.error || "Failed to load quiz")
+        const qs: Question[] = (jsonQuiz.data?.questions || []).map((q: any) => ({
+          id: String(q.id),
+          question: q.question,
+          options: Array.isArray(q.options) ? q.options : q.options ? JSON.parse(q.options) : [],
+          explanation: q.explanation || "",
+        }))
+        setQuestions(qs)
 
-    const storedAnswers = sessionStorage.getItem("quizAnswers")
-    if (storedAnswers) {
-      setAnswers(JSON.parse(storedAnswers))
+        // 2) lấy answers từ sessionStorage rồi gọi submit API để lấy đáp án đúng
+        const storedAnswers = sessionStorage.getItem("quizAnswers")
+        const parsed: SubmitAnswer[] = storedAnswers ? JSON.parse(storedAnswers) : []
+        setAnswers(parsed)
+
+        if (parsed.length > 0) {
+          const resSubmit = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}/submit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ answers: parsed }),
+          })
+          const jsonSubmit = await resSubmit.json()
+          if (!resSubmit.ok || !jsonSubmit?.success) {
+            throw new Error(jsonSubmit?.error || "Failed to evaluate answers")
+          }
+          setDetails((jsonSubmit.data?.details as SubmitDetail[]) || [])
+        } else {
+          setDetails([])
+        }
+      } catch (e: any) {
+        console.error("review load error:", e)
+        setError(e?.message || "Failed to load review")
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [])
+    if (quizId) load()
+  }, [quizId])
 
-  const getIsCorrect = (questionId: string, selected: number[]) => {
-    const expected = correctAnswers[questionId] || []
-    return selected.length === expected.length && selected.sort().every((v, i) => v === expected.sort()[i])
-  }
+  const byId = useMemo(() => {
+    const map = new Map(details.map((d) => [d.questionId, d]))
+    return map
+  }, [details])
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (error) return <div className="min-h-screen flex items-center justify-center text-red-400">{error}</div>
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 p-6">
@@ -89,10 +100,11 @@ export default function ReviewPage() {
 
         <div className="space-y-6">
           {questions.map((question, index) => {
-            const answer = answers.find((a) => a.questionId === question.id)
-            const selected = answer?.selected || []
-            const isCorrect = getIsCorrect(question.id, selected)
-            const correctAnswerIndices = correctAnswers[question.id] || []
+            const ans = answers.find((a) => a.questionId === question.id)
+            const selected = ans?.selected || []
+            const detail = byId.get(question.id)
+            const isCorrect = detail?.correct ?? false
+            const correctAnswerIndices = detail?.correctOptions || []
 
             return (
               <div
@@ -131,18 +143,18 @@ export default function ReviewPage() {
                   </div>
                 </div>
 
-                {!isCorrect && (
+                {!isCorrect && correctAnswerIndices.length > 0 && (
                   <div className="mb-4">
                     <p className="text-sm text-slate-400 mb-2">Correct answer:</p>
                     <div className="p-3 rounded bg-emerald-900 text-emerald-100">
-                      {question.options[correctAnswerIndices[0]]}
+                      {correctAnswerIndices.map((i) => question.options[i]).join(", ")}
                     </div>
                   </div>
                 )}
 
                 <div className="bg-slate-700 p-4 rounded">
                   <p className="text-sm font-semibold text-slate-300 mb-2">Explanation</p>
-                  <p className="text-slate-200">{question.explanation}</p>
+                  <p className="text-slate-200">{detail?.explanation || question.explanation || ""}</p>
                 </div>
               </div>
             )

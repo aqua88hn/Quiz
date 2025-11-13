@@ -65,31 +65,72 @@ CREATE TABLE IF NOT EXISTS questions (
   explanation TEXT,
   type VARCHAR(50) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS  user_sessions (
-  id VARCHAR(255) PRIMARY KEY,
-  quiz_id VARCHAR(255) NOT NULL,
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  quiz_id VARCHAR(255) NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
   answers JSONB NOT NULL,
   score_percent INTEGER,
   correct_count INTEGER,
   total_count INTEGER,
-  status VARCHAR(50) DEFAULT 'in_progress',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  completed_at TIMESTAMP,
-  FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
+  status VARCHAR(50) NOT NULL DEFAULT 'in_progress',
+  client_ip VARCHAR(45),
+  user_agent TEXT,
+  created_at timestamptz NOT NULL DEFAULT timezone('UTC', now()),
+  updated_at timestamptz NOT NULL DEFAULT timezone('UTC', now()),
+  completed_at timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS public.db_error_logs (
+  id bigserial PRIMARY KEY,
+  sql_text text NOT NULL,
+  params jsonb,
+  error_code text,
+  error_message text,
+  error_detail text,
+  created_at timestamptz NOT NULL DEFAULT timezone('UTC', now())
 );
 
 -- Create indexes
-CREATE INDEX idx_questions_quiz_id ON questions(quiz_id);
-CREATE INDEX idx_user_sessions_quiz_id ON user_sessions(quiz_id);
-CREATE INDEX idx_user_sessions_status ON user_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_questions_quiz_id ON questions(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_quiz_id ON user_sessions(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_status ON user_sessions(status);
 
 
 -- Create indexes
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+
+-- Indexes for sessions (lọc theo user/quiz/time)
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_quiz_id ON user_sessions(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_status ON user_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_quiz_created
+  ON user_sessions(user_id, quiz_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_created_brin
+  ON user_sessions USING BRIN (created_at);
+
+-- Indexes for db_error_logs
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- Time-range scans on large append-only log table
+CREATE INDEX IF NOT EXISTS idx_db_error_logs_created_at_brin
+  ON db_error_logs USING BRIN (created_at);
+
+-- Filter by code and order by time
+CREATE INDEX IF NOT EXISTS idx_db_error_logs_error_code_created_at
+  ON db_error_logs (error_code, created_at DESC);
+
+-- Optional: substring search in SQL/error text
+CREATE INDEX IF NOT EXISTS idx_db_error_logs_sql_text_trgm
+  ON db_error_logs USING GIN (sql_text gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_db_error_logs_error_message_trgm
+  ON db_error_logs USING GIN (error_message gin_trgm_ops);

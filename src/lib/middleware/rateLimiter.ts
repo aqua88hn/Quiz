@@ -22,7 +22,10 @@ class RateLimiter {
   private config: Required<RateLimitConfig>
 
   constructor(config?: RateLimitConfig) {
-    this.config = { ...defaultConfig, ...config }
+    this.config = {
+      windowMs: config?.windowMs ?? defaultConfig.windowMs,
+      maxRequests: config?.maxRequests ?? defaultConfig.maxRequests,
+    }
     // Cleanup old entries every minute
     setInterval(() => this.cleanup(), 60000)
   }

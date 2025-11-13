@@ -76,6 +76,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
             setAnswer([])
           }}
           className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-emerald-500 focus:outline-none"
+          title="Select question type"
         >
           <option value="singleSelect">Single Select</option>
           <option value="multiSelect">Multi Select</option>

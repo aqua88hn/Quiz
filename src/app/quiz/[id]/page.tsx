@@ -27,57 +27,49 @@ export default function QuizPage() {
   const [answers, setAnswers] = useState<{ [key: string]: number[] }>({})
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Fetch quiz data
-    const mockQuiz: Quiz = {
-      id: quizId,
-      title: quizId === "python_keywords_expert" ? "Python Keywords Expert" : "Python Basics",
-      questions: [
-        {
-          id: "q1",
-          question: "Từ khóa nào dùng để định nghĩa một hàm trong Python?",
-          options: ["function", "def", "lambda", "define"],
-          type: "singleSelect",
-          explanation: 'Từ khóa "def" được sử dụng để định nghĩa một hàm trong Python.',
-        },
-        {
-          id: "q2",
-          question: "Từ khóa nào dùng để tạo một hàm bất động bộ?",
-          options: ["async", "await", "def", "thread"],
-          type: "singleSelect",
-          explanation: 'Từ khóa "async" được sử dụng để định nghĩa một hàm bất động bộ trong Python.',
-        },
-        {
-          id: "q3",
-          question: 'Từ khóa "yield" thường được dùng trong loại hàm nào?',
-          options: ["Hàm bình thường", "Generator", "Hàm lambda", "Async function"],
-          type: "singleSelect",
-          explanation: '"yield" được sử dụng trong các hàm generator để trả về các giá trị một lần một.',
-        },
-        {
-          id: "q4",
-          question: "Cách nào để tạo một hàm với số lượng đối số không xác định?",
-          options: ["*args", "**kwargs", "Cả hai *args và **kwargs", "Không thể làm được"],
-          type: "multiSelect",
-          explanation: "Cả *args và **kwargs đều có thể được sử dụng để tạo hàm với số lượng đối số không xác định.",
-        },
-        {
-          id: "q5",
-          question: "Từ khóa nào dùng để xử lý ngoại lệ trong Python?",
-          options: ["try-catch", "try-except", "error-handle", "handle-error"],
-          type: "singleSelect",
-          explanation: 'Từ khóa "try-except" được sử dụng để xử lý ngoại lệ trong Python.',
-        },
-      ],
-    }
+    if (!quizId) return
+    setLoading(true)
+    setError(null)
 
-    setQuiz(mockQuiz)
-    setLoading(false)
+    fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.success && json.data) {
+          // Expect API returns { id, title, questions: [...] }
+          const data = json.data
+          // Normalize questions/options just in case
+          const questions: Question[] = (data.questions || []).map((q: any) => ({
+            id: String(q.id),
+            question: q.question,
+            options: Array.isArray(q.options) ? q.options : q.options ? JSON.parse(q.options) : [],
+            type: q.type === "multiSelect" ? "multiSelect" : "singleSelect",
+            explanation: q.explanation || "",
+          }))
+          setQuiz({ id: data.id, title: data.title, questions })
+        } else {
+          setError(json?.error || "Quiz not found")
+          setQuiz(null)
+        }
+      })
+      .catch((e) => {
+        console.error("load quiz error", e)
+        setError("Failed to load quiz")
+        setQuiz(null)
+      })
+      .finally(() => setLoading(false))
   }, [quizId])
 
-  if (loading || !quiz) {
+  if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  }
+  if (error) {
+    return <div className="flex items-center justify-center min-h-screen text-red-400">{error}</div>
+  }
+  if (!quiz) {
+    return <div className="flex items-center justify-center min-h-screen">Quiz not found</div>
   }
 
   const question = quiz.questions[currentQuestion]
@@ -86,7 +78,7 @@ export default function QuizPage() {
 
   const handleNext = () => {
     if (!isLastQuestion) {
-      setCurrentQuestion(currentQuestion + 1)
+      setCurrentQuestion((s) => s + 1)
     } else {
       // Submit quiz
       const submitAnswers = quiz.questions.map((q) => ({
@@ -103,7 +95,7 @@ export default function QuizPage() {
 
   const handlePrevious = () => {
     if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1)
+      setCurrentQuestion((s) => s - 1)
     }
   }
 
@@ -136,7 +128,7 @@ export default function QuizPage() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-white">Quiz</h1>
+            <h1 className="text-2xl font-bold text-white">{quiz.title}</h1>
             <button className="text-slate-400 hover:text-white">
               <span className="text-2xl">✏️</span>
             </button>

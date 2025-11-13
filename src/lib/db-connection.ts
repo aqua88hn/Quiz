@@ -32,8 +32,9 @@ function initializePool(): Pool {
 
   // Log pool connection events in development
   if (process.env.NODE_ENV === "development") {
-    newPool.on("connect", () => {
+    newPool.on("connect", (client) => {
       console.log("[DB POOL] New client connected")
+      client.query("SET TIME ZONE 'UTC'").catch(() => {})
     })
     newPool.on("remove", () => {
       console.log("[DB POOL] Client removed from pool")

@@ -10,10 +10,9 @@ interface AdminQuestionCardProps {
     explanation: string
   }
   index: number
-  onDelete: () => void
 }
 
-export function AdminQuestionCard({ question, index, onDelete }: AdminQuestionCardProps) {
+export function AdminQuestionCard({ question, index }: AdminQuestionCardProps) {
   return (
     <div className="p-6 bg-slate-800 rounded-lg border border-slate-700 hover:border-emerald-500 transition-colors">
       <div className="flex items-start justify-between mb-4">
@@ -22,9 +21,6 @@ export function AdminQuestionCard({ question, index, onDelete }: AdminQuestionCa
             {index + 1}. {question.question}
           </h3>
         </div>
-        <button onClick={onDelete} className="text-red-400 hover:text-red-300 text-sm ml-4">
-          Delete
-        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-4">

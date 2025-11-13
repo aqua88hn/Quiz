@@ -16,45 +16,75 @@ export default function ResultPage() {
   const [scorePercent, setScorePercent] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Calculate score based on stored answers
-    const storedAnswers = sessionStorage.getItem("quizAnswers")
+    async function calc() {
+      try {
+        setLoading(true)
+        setError(null)
 
-    // Mock correct answers for demo
-    const correctAnswers: { [key: string]: number[] } = {
-      q1: [1], // def
-      q2: [0], // async
-      q3: [1], // Generator
-      q4: [0, 1], // *args and **kwargs
-      q5: [1], // try-except
+        const stored = sessionStorage.getItem("quizAnswers")
+        if (!stored) {
+          // Không có đáp án để chấm => quay lại làm bài
+          router.replace(`/quiz/${quizId}`)
+          return
+        }
+        const answers: SubmitAnswer[] = JSON.parse(stored)
+
+        // Gọi API để chấm điểm bằng dữ liệu trong Postgres
+        const res = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers }),
+        })
+        const json = await res.json()
+
+        if (!res.ok || !json?.success) {
+          throw new Error(json?.error || "Failed to evaluate answers")
+        }
+
+        const data = json.data as {
+          scorePercent: number
+          correctCount: number
+          total: number
+        }
+
+        setScorePercent(data.scorePercent || 0)
+        setCorrectCount(data.correctCount || 0)
+        setTotalCount(data.total || answers.length || 0)
+      } catch (e: any) {
+        console.error("result evaluate error:", e)
+        setError(e?.message || "Failed to calculate result")
+      } finally {
+        setLoading(false)
+      }
     }
-
-    if (storedAnswers) {
-      const answers: SubmitAnswer[] = JSON.parse(storedAnswers)
-      let correct = 0
-
-      answers.forEach((answer) => {
-        const expectedAnswer = correctAnswers[answer.questionId] || []
-        const isCorrect =
-          answer.selected.length === expectedAnswer.length &&
-          answer.selected.sort().every((v, i) => v === expectedAnswer.sort()[i])
-
-        if (isCorrect) correct++
-      })
-
-      const percent = Math.round((correct / answers.length) * 100)
-      setScorePercent(percent)
-      setCorrectCount(correct)
-      setTotalCount(answers.length)
-    }
-  }, [])
+    if (quizId) calc()
+  }, [quizId, router])
 
   const getMessage = () => {
     if (scorePercent === 100) return "Amazing work!"
     if (scorePercent >= 80) return "Great job!"
     if (scorePercent >= 60) return "Good effort!"
     return "Keep practicing!"
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center p-6">
+        <div className="text-slate-300">Calculating result...</div>
+      </main>
+    )
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center p-6">
+        <div className="text-red-400">{error}</div>
+      </main>
+    )
   }
 
   return (

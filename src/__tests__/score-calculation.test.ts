@@ -1,4 +1,4 @@
-import { submitAnswers, type Answer } from "@/lib/db"
+import { submitAnswers, type Answer } from "@/lib/db-quiz-question"
 
 describe("Score Calculation", () => {
   it("should calculate 100% for all correct single-select answers", () => {

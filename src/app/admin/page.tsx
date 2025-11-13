@@ -23,40 +23,73 @@ export default function AdminPage() {
     description: "",
     difficulty: "Beginner",
   })
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Fetch quizzes
-    const mockQuizzes: Quiz[] = [
-      {
-        id: "python_keywords_expert",
-        title: "Python Keywords Expert",
-        description: "Advanced questions on Python reserved keywords",
-        questionCount: 5,
-        difficulty: "Expert",
-      },
-      {
-        id: "python_basics",
-        title: "Python Basics",
-        description: "Fundamental concepts of Python programming",
-        questionCount: 5,
-        difficulty: "Beginner",
-      },
-    ]
-    setQuizzes(mockQuizzes)
-    setLoading(false)
+    let ignore = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await fetch("/api/v1/quizzes", { cache: "no-store" })
+        const json = await res.json()
+        if (!res.ok || !json?.success) throw new Error(json?.error || "Failed to load quizzes")
+
+        const data: any[] = json.data || []
+        if (ignore) return
+        setQuizzes(
+          data.map((q) => ({
+            id: String(q.id),
+            title: q.title,
+            description: q.description || "",
+            questionCount: Number(q.questionCount ?? q.question_count ?? 0),
+            // DB chưa có cột difficulty -> đặt mặc định để giữ UI logic
+            difficulty: "Beginner",
+          })),
+        )
+      } catch (e: any) {
+        console.error("[Admin] load quizzes error:", e)
+        setError(e?.message || "Failed to load quizzes")
+        setQuizzes([])
+      } finally {
+        setLoading(false)
+      }
+    })()
+    return () => {
+      ignore = true
+    }
   }, [])
 
-  const handleCreateQuiz = (e: React.FormEvent) => {
+  const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault()
-    const id = newQuiz.title.toLowerCase().replace(/\s+/g, "_")
-    const quiz: Quiz = {
-      id,
-      ...newQuiz,
-      questionCount: 0,
+    try {
+      const payload = { title: newQuiz.title, description: newQuiz.description }
+      const res = await fetch("/api/v1/quizzes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.error || "Failed to create quiz")
+      }
+      // API trả về { id, title, description, created_at }
+      const created = json.data as { id: string; title: string; description?: string }
+      const quiz: Quiz = {
+        id: String(created.id),
+        title: created.title,
+        description: created.description || "",
+        questionCount: 0,
+        // giữ logic UI: dùng difficulty từ form (chưa lưu DB)
+        difficulty: newQuiz.difficulty,
+      }
+      setQuizzes((prev) => [quiz, ...prev])
+      setNewQuiz({ title: "", description: "", difficulty: "Beginner" })
+      setShowNewQuizForm(false)
+    } catch (e: any) {
+      console.error("[Admin] create quiz error:", e)
+      alert(e?.message || "Create quiz failed")
     }
-    setQuizzes([...quizzes, quiz])
-    setNewQuiz({ title: "", description: "", difficulty: "Beginner" })
-    setShowNewQuizForm(false)
   }
 
   if (loading) {
@@ -75,6 +108,12 @@ export default function AdminPage() {
             ← Back to Home
           </Link>
         </div>
+
+        {error && (
+          <div className="mb-4 rounded bg-red-900/40 border border-red-700 text-red-200 px-4 py-3">
+            {error}
+          </div>
+        )}
 
         {showNewQuizForm && (
           <div className="mb-8 p-6 bg-slate-800 rounded-lg border border-slate-700">
@@ -105,8 +144,9 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Difficulty</label>
+                <label htmlFor="difficulty" className="block text-sm font-medium text-slate-300 mb-2">Difficulty</label>
                 <select
+                  id="difficulty"
                   value={newQuiz.difficulty}
                   onChange={(e) => setNewQuiz({ ...newQuiz, difficulty: e.target.value })}
                   className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-emerald-500 focus:outline-none"

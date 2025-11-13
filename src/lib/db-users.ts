@@ -65,13 +65,19 @@ export async function createAuditLog(
 ) {
   try {
     const pool = getPool()
-    await pool.query(
+    const result = await pool.query(
       `INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+       VALUES ($1, $2, $3, $4, $5, timezone('UTC', now()))
+       RETURNING id`,
       [userId, action, resourceType, resourceId, JSON.stringify(details)]
     )
+    if (result && result.rowCount != null && result.rowCount > 0) {
+      return { ok: true, id: result.rows[0].id }
+    }
+    return { ok: false }
   } catch (error) {
-    console.error("[DB] Error creating audit log:", error)
+    console.error("[DB] Error creating audit log:", error) 
+    return { ok: false, error: String(error) }
   }
 }
 
@@ -104,7 +110,7 @@ export async function updateUser(
        SET 
          status = COALESCE($2, status), 
          role = COALESCE($3, role), 
-         updated_at = CURRENT_TIMESTAMP
+         updated_at = timezone('UTC', now())
        WHERE id = $1 AND is_deleted = false
        RETURNING *`,
       [userId, updates.status || null, updates.role || null]
@@ -113,5 +119,19 @@ export async function updateUser(
   } catch (error) {
     console.error("[DB] Error updating user:", error)
     return null
+  }
+}
+
+export async function updateUserLastLogin(userId: number) : Promise<void> {
+  try {
+    const pool = getPool()
+    await pool.query(
+      `UPDATE users 
+       SET last_login = timezone('UTC', now())
+       WHERE id = $1 AND is_deleted = false`,
+      [userId]
+    )
+  } catch (error) {
+    console.error("[DB] Error updating last_login:", error)
   }
 }
