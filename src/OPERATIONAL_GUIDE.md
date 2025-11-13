@@ -157,3 +157,4 @@ const response = await httpClient.get('https://api.example.com/data', {
   retries: 3,
   backoffMs: 100,
 });
+```

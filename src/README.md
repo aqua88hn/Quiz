@@ -76,7 +76,7 @@ ADMIN_PASSWORD=admin123
 
 4. Run development server:
 ```bash
-npm run dev
+NODE_ENV=development npm run dev
 ```
 
 5. Open [http://localhost:3000](http://localhost:3000)

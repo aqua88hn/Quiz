@@ -1,5 +1,20 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { verifyToken } from "@/lib/auth-postgres"
+import { type NextRequest, NextResponse } from "next/server" 
+import { logger } from '@/lib/middleware/logger'
+
+function verifyToken(token: string): any | null {
+  try {
+    const decoded = JSON.parse(Buffer.from(token, "base64").toString()) as any
+
+    // Check expiration
+    if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
+      return null
+    }
+
+    return decoded
+  } catch {
+    return null
+  }
+}
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
@@ -7,6 +22,7 @@ export function middleware(request: NextRequest) {
   // Protect admin routes
   if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
     const token = request.cookies.get("adminToken")?.value
+    logger.debug('token: ', { token });
 
     if (!token) {
       return NextResponse.redirect(new URL("/admin/login", request.url))

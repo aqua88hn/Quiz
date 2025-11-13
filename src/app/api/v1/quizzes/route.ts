@@ -16,6 +16,8 @@ function toSlug(s: string) {
     .replace(/_+/g, "_");
 }
 
+const allowedDifficulties = new Set(["Beginner", "Intermediate", "Expert"])
+
 async function handlePOST(request: NextRequest) {
   let body: any = {};
   try {
@@ -27,12 +29,16 @@ async function handlePOST(request: NextRequest) {
   const title = (body?.title || "").trim();
   if (!title) return NextResponse.json({ success: false, error: "Missing title" }, { status: 400 });
 
+  // new fields
+  const question_count = Number.isFinite(Number(body?.question_count)) ? Number(body.question_count) : 0
+  let difficulty: string = String(body?.difficulty || "Beginner")
+  if (!allowedDifficulties.has(difficulty)) difficulty = "Beginner"
+
   const id = body?.id ? toSlug(String(body.id)) : toSlug(title);
   try {
-    const created = await createQuiz({ id, title, description: body?.description ?? null });
+    const created = await createQuiz({ id, title, description: body?.description ?? null, question_count, difficulty });
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (err: any) {
-    // common PG errors
     if (err?.code === "23505") {
       return NextResponse.json({ success: false, error: `Quiz id '${id}' already exists` }, { status: 409 });
     }

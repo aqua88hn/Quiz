@@ -22,6 +22,7 @@ export default function AdminPage() {
     title: "",
     description: "",
     difficulty: "Beginner",
+    questionCount: 0,
   })
   const [error, setError] = useState<string | null>(null)
 
@@ -42,9 +43,8 @@ export default function AdminPage() {
             id: String(q.id),
             title: q.title,
             description: q.description || "",
-            questionCount: Number(q.questionCount ?? q.question_count ?? 0),
-            // DB chưa có cột difficulty -> đặt mặc định để giữ UI logic
-            difficulty: "Beginner",
+            questionCount: Number(q.question_count ?? q.questionCount ?? 0),
+            difficulty: q.difficulty || "Beginner",
           })),
         )
       } catch (e: any) {
@@ -63,7 +63,12 @@ export default function AdminPage() {
   const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const payload = { title: newQuiz.title, description: newQuiz.description }
+      const payload = {
+        title: newQuiz.title,
+        description: newQuiz.description,
+        question_count: Number(newQuiz.questionCount) || 0,
+        difficulty: newQuiz.difficulty,
+      }
       const res = await fetch("/api/v1/quizzes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,18 +78,16 @@ export default function AdminPage() {
       if (!res.ok || !json?.success) {
         throw new Error(json?.error || "Failed to create quiz")
       }
-      // API trả về { id, title, description, created_at }
-      const created = json.data as { id: string; title: string; description?: string }
+      const created = json.data as any
       const quiz: Quiz = {
         id: String(created.id),
         title: created.title,
         description: created.description || "",
-        questionCount: 0,
-        // giữ logic UI: dùng difficulty từ form (chưa lưu DB)
-        difficulty: newQuiz.difficulty,
+        questionCount: Number(created.question_count ?? 0),
+        difficulty: created.difficulty || newQuiz.difficulty,
       }
       setQuizzes((prev) => [quiz, ...prev])
-      setNewQuiz({ title: "", description: "", difficulty: "Beginner" })
+      setNewQuiz({ title: "", description: "", difficulty: "Beginner", questionCount: 0 })
       setShowNewQuizForm(false)
     } catch (e: any) {
       console.error("[Admin] create quiz error:", e)
@@ -143,18 +146,33 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div>
-                <label htmlFor="difficulty" className="block text-sm font-medium text-slate-300 mb-2">Difficulty</label>
-                <select
-                  id="difficulty"
-                  value={newQuiz.difficulty}
-                  onChange={(e) => setNewQuiz({ ...newQuiz, difficulty: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-emerald-500 focus:outline-none"
-                >
-                  <option>Beginner</option>
-                  <option>Intermediate</option>
-                  <option>Expert</option>
-                </select>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="difficulty" className="block text-sm font-medium text-slate-300 mb-2">Difficulty</label>
+                  <select
+                    id="difficulty"
+                    value={newQuiz.difficulty}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, difficulty: e.target.value })}
+                    className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-emerald-500 focus:outline-none"
+                  >
+                    <option>Beginner</option>
+                    <option>Intermediate</option>
+                    <option>Expert</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="questionCount" className="block text-sm font-medium text-slate-300 mb-2">Question count</label>
+                  <input
+                    id="questionCount"
+                    type="number"
+                    min={0}
+                    value={newQuiz.questionCount}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, questionCount: Number(e.target.value) })}
+                    className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-emerald-500 focus:outline-none"
+                    placeholder="0"
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3">

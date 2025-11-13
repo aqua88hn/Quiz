@@ -1,10 +1,14 @@
 import { error } from "console";
 import { getPool } from "./db-connection"
 import { randomUUID } from "crypto"
+import { logger } from '@/lib/middleware/logger'
 
 function dbDebug(sql: string, params?: any[]) {
   console.debug("[DB DEBUG] Query:", sql.trim().replace(/\s+/g, " "))
   if (params?.length) console.debug("[DB DEBUG] Values:", params)
+  
+  
+  logger.debug('Test logger.debug : ', { params });
 }
 
 const UTC_NOW = "timezone('UTC', now())"
@@ -56,9 +60,33 @@ async function logDbError(sql: string, params: any[] | undefined, err: any) {
   }
 }
 
+async function formatLocalTime(date: string | Date | null | undefined): Promise<string | undefined> {
+  if (!date) return undefined;
+  return new Date(date).toLocaleString();
+}
+
+const QUESTION_ID_PREFIX = process.env.QUIZ_QUESTION_ID_PREFIX || "q"
+function generatePrefixedId(prefix = QUESTION_ID_PREFIX): string {
+  // Prefer Web Crypto if available
+  const uuid =
+    (globalThis as any)?.crypto?.randomUUID?.()
+      ?.toString()
+      ?.replace(/-/g, "")
+  if (uuid) return `${prefix}_${uuid}`
+  // Fallback: timestamp + random
+  const d = new Date()
+  const ts = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(
+    d.getUTCDate(),
+  ).padStart(2, "0")}${String(d.getUTCHours()).padStart(2, "0")}${String(d.getUTCMinutes()).padStart(
+    2,
+    "0",
+  )}${String(d.getUTCSeconds()).padStart(2, "0")}${String(d.getUTCMilliseconds()).padStart(3, "0")}`
+  const rand = Math.random().toString(36).slice(2, 10)
+  return `${prefix}_${ts}_${rand}`
+}
 // UTC helper
 const SQL_GET_QUIZZES = `
-SELECT q.id, q.title, q.description, q.created_at, COUNT(qq.id) AS question_count
+SELECT q.id, q.title, q.description, q.created_at, COUNT(qq.id) AS question_count, q.difficulty
 FROM quizzes q
 LEFT JOIN questions qq ON qq.quiz_id = q.id
 GROUP BY q.id
@@ -73,17 +101,21 @@ export async function getQuizzes() {
   return res.rows.map((r: any) => ({
     id: String(r.id),
     title: r.title,
-    description: r.description ?? null,
-    questionCount: Number(r.question_count || 0),
-    created_at: r.created_at,
+    description: r.description ?? "",
+    question_count: Number(r.question_count ?? 0),
+    difficulty: r.difficulty || "Beginner",
+    created_at: r.created_at ?? null,
+    updated_at: r.updated_at ?? null,
   }));
 }
 
 // create new quiz
 export async function createQuiz(payload: {
-  id?: string;
-  title: string;
-  description?: string | null;
+  id?: string
+  title: string
+  description?: string | null
+  question_count?: number
+  difficulty?: string
 }) {
   const pool = getPool();
   const id = (payload.id || payload.title)
@@ -93,29 +125,22 @@ export async function createQuiz(payload: {
     .replace(/\s+/g, "_")
     .replace(/_+/g, "_");
 
-  const params = [id, payload.title, payload.description ?? null];
+  const questionCount = Number.isFinite(payload.question_count) ? Number(payload.question_count) : 0
+  const difficulty = payload.difficulty || "Beginner"
 
   // Try with created_at; if column doesn't exist (42703) fallback to 3-column insert.
-  const SQL_WITH_CREATED = `INSERT INTO quizzes (id, title, description, created_at)
-                            VALUES ($1, $2, $3, ${UTC_NOW})
-                            RETURNING id, title, description, created_at`;
-  const SQL_SIMPLE = `INSERT INTO quizzes (id, title, description)
-                      VALUES ($1, $2, $3)
-                      RETURNING id, title, description`;
+  const SQL_WITH_CREATED = `
+    INSERT INTO quizzes (id, title, description, question_count, difficulty, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, ${UTC_NOW}, ${UTC_NOW})
+    RETURNING id, title, description, question_count, difficulty, created_at, updated_at`; 
 
+  const params = [id, payload.title, payload.description ?? null, questionCount, difficulty];
   try {
     dbDebug(SQL_WITH_CREATED, params);
     const r = await pool.query(SQL_WITH_CREATED, params);
     return r.rows[0];
   } catch (err: any) {
-    if (err?.code === "42703") {
-      // column "created_at" does not exist
-      dbDebug(SQL_SIMPLE, params);
-      const r2 = await pool.query(SQL_SIMPLE, params);
-      return r2.rows[0];
-    }
-    // propagate other errors to API (409 unique_violation, etc.)
-    throw err;
+    await logDbError(SQL_WITH_CREATED, params, err)
   }
 }
 
@@ -144,8 +169,8 @@ export async function getQuestionsByQuizId(quizId: string) {
       answer: normalizeAnswer(r.answer),
       explanation: r.explanation ?? "",
       type: r.type === "multiSelect" ? "multiSelect" : "singleSelect",
-      created_at: r.created_at ? new Date(r.created_at).toISOString() : undefined,
-      updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+      created_at: formatLocalTime(r.created_at),
+      updated_at: formatLocalTime(r.updated_at),
     }))
   } catch (e: any) {
     await logDbError(SQL, [quizId], e)
@@ -158,12 +183,14 @@ export async function createQuestionForQuiz(
   body: { question: string; options: any[]; answer: number[]; explanation?: string; type?: string },
 ) {
   const pool = getPool()
+  const newId = generatePrefixedId()
 
   // Try schema with Postgres arrays (text[]/int[]) 
-  const SQL_ARRAY = `INSERT INTO questions (quiz_id, question, options, answer, explanation, type, created_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, ${UTC_NOW})
+  const SQL_ARRAY = `INSERT INTO questions (id, quiz_id, question, options, answer, explanation, type, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, ${UTC_NOW})
                      RETURNING id, quiz_id, question, options, answer, explanation, type, created_at`
   const P_ARRAY = [
+    newId,
     quizId,
     body.question,
     (body.options || []).map(String),
@@ -184,7 +211,7 @@ export async function createQuestionForQuiz(
       answer: normalizeAnswer(r.answer),
       explanation: r.explanation ?? "",
       type: r.type === "multiSelect" ? "multiSelect" : "singleSelect",
-      created_at: r.created_at ? new Date(r.created_at).toISOString() : undefined,
+      created_at: formatLocalTime(r.created_at),
     }
   } catch (e: any) {
     // log and fallback to JSONB if type mismatch/column jsonb
@@ -194,10 +221,11 @@ export async function createQuestionForQuiz(
   }
 
   // Fallback JSONB schema
-  const SQL_JSONB = `INSERT INTO questions (quiz_id, question, options, answer, explanation, type, created_at)
-                     VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, ${UTC_NOW})
+  const SQL_JSONB = `INSERT INTO questions (id, quiz_id, question, options, answer, explanation, type, created_at)
+                     VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, ${UTC_NOW})
                      RETURNING id, quiz_id, question, options, answer, explanation, type, created_at`
   const P_JSONB = [
+    newId,
     quizId,
     body.question,
     JSON.stringify((body.options || []).map(String)),
@@ -217,7 +245,7 @@ export async function createQuestionForQuiz(
       answer: normalizeAnswer(r.answer),
       explanation: r.explanation ?? "",
       type: r.type === "multiSelect" ? "multiSelect" : "singleSelect",
-      created_at: r.created_at ? new Date(r.created_at).toISOString() : undefined,
+      created_at: formatLocalTime(r.created_at),
     }
   } catch (e2: any) {
     await logDbError(SQL_JSONB, P_JSONB, e2)
@@ -227,16 +255,22 @@ export async function createQuestionForQuiz(
 
 export async function updateQuiz(
   id: string,
-  updates: { title?: string; description?: string | null }
-) {
+  updates: { 
+    title?: string; 
+    description?: string | null;
+    question_count?: number | null;
+    difficulty?: string | null
+  }) {
   const pool = getPool();
   const SQL_WITH_UPDATED = `
     UPDATE quizzes
        SET title = COALESCE($2, title),
            description = COALESCE($3, description),
+           question_count = COALESCE($4, question_count),
+           difficulty = COALESCE($5, difficulty),
            updated_at = ${UTC_NOW}
      WHERE id = $1
-     RETURNING id, title, description, created_at, updated_at
+     RETURNING id, title, description, question_count, difficulty, created_at, updated_at
   `;
   const SQL_NO_UPDATED = `
     UPDATE quizzes
@@ -246,7 +280,13 @@ export async function updateQuiz(
      WHERE id = $1
      RETURNING id, title, description, created_at
   `;
-  const params = [id, updates.title ?? null, updates.description ?? null];
+  const params = [
+    id,
+    updates.title ?? null,
+    updates.description ?? null,
+    updates.question_count ?? null,
+    updates.difficulty ?? null,
+  ]
   try {
     dbDebug(SQL_WITH_UPDATED, params);
     const res = await pool.query(SQL_WITH_UPDATED, params);
@@ -255,12 +295,8 @@ export async function updateQuiz(
       ? {
           ...row,
           id: String(row.id),
-          created_at: row.created_at
-            ? new Date(row.created_at).toISOString()
-            : undefined,
-          updated_at: row.updated_at
-            ? new Date(row.updated_at).toISOString()
-            : undefined,
+          created_at: formatLocalTime(row.created_at),
+          updated_at: formatLocalTime(row.updated_at),
         }
       : null;
   } catch (e: any) {
@@ -274,9 +310,7 @@ export async function updateQuiz(
     ? {
         ...row,
         id: String(row.id),
-        created_at: row.created_at
-          ? new Date(row.created_at).toISOString()
-          : undefined,
+        created_at: formatLocalTime(row.created_at),
       }
     : null;
 }
@@ -335,7 +369,7 @@ export async function updateQuestion(
         answer: normalizeAnswer(r.answer),
         explanation: r.explanation ?? "",
         type: r.type === "multiSelect" ? "multiSelect" : "singleSelect",
-        updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+        updated_at: formatLocalTime(r.updated_at),
       }
     }
   } catch (e: any) {
@@ -377,7 +411,7 @@ export async function updateQuestion(
     answer: normalizeAnswer(r.answer),
     explanation: r.explanation ?? "",
     type: r.type === "multiSelect" ? "multiSelect" : "singleSelect",
-    updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+    updated_at: formatLocalTime(r.updated_at),
   }
 }
 
@@ -402,7 +436,7 @@ export async function saveCompletedUserSession(input: {
   userAgent?: string | null
 }) {
   const pool = getPool()
-  const id = randomUUID()
+  const id = (globalThis as any)?.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
   const SQL = `
     INSERT INTO user_sessions
       (id, quiz_id, user_id, answers, score_percent, correct_count, total_count, status,
@@ -441,7 +475,7 @@ export async function getUserSessionsByUser(userId: number, opts?: { limit?: num
   const res = await pool.query(SQL, [userId, limit, offset])
   return res.rows.map((r: any) => ({
     ...r,
-    created_at: r.created_at ? new Date(r.created_at).toISOString() : null,
-    completed_at: r.completed_at ? new Date(r.completed_at).toISOString() : null,
+    created_at: formatLocalTime(r.created_at),
+    completed_at: formatLocalTime(r.completed_at),
   }))
 }
