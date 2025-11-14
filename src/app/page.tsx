@@ -8,8 +8,9 @@ type QuizListItem = {
   id: string
   title: string
   description?: string | null
-  questionCount?: number
+  question_count?: number
   created_at?: string
+  difficulty?: "Beginner" | "Intermediate" | "Expert" | string
 }
 
 export default async function Home() {
@@ -24,9 +25,11 @@ export default async function Home() {
     id: String(q.id),
     title: q.title,
     description: q.description || "",
-    questionCount: Number(q.questionCount ?? 0),
-    // DB chưa có cột difficulty -> mặc định để giữ UI
-    difficulty: "Beginner",
+    questionCount: Number(q.question_count ?? 0),
+    difficulty:
+      q.difficulty && ["Beginner", "Intermediate", "Expert"].includes(q.difficulty)
+        ? q.difficulty
+        : "Beginner",
   }))
 
   return (

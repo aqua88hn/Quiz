@@ -27,33 +27,50 @@ export default function ResultPage() {
 
         const stored = sessionStorage.getItem("quizAnswers")
         if (!stored) {
-          // Không có đáp án để chấm => quay lại làm bài
           router.replace(`/quiz/${quizId}`)
           return
         }
         const answers: SubmitAnswer[] = JSON.parse(stored)
 
-        // Gọi API để chấm điểm bằng dữ liệu trong Postgres
         const res = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers }),
+          // include quizId for compatibility; server can ignore if not needed
+          body: JSON.stringify({ quizId, answers }),
         })
         const json = await res.json()
-
         if (!res.ok || !json?.success) {
           throw new Error(json?.error || "Failed to evaluate answers")
         }
 
-        const data = json.data as {
-          scorePercent: number
-          correctCount: number
-          total: number
+        const data = json.data || {}
+        const toInt = (v: any, def = 0) => {
+          const n = Number(v)
+          return Number.isFinite(n) ? n : def
         }
 
-        setScorePercent(data.scorePercent || 0)
-        setCorrectCount(data.correctCount || 0)
-        setTotalCount(data.total || answers.length || 0)
+        // Prefer server-provided summary if valid
+        let correct = toInt(data.correctCount, NaN)
+        let total = toInt(data.total, NaN)
+        let percent = toInt(data.scorePercent, NaN)
+
+        // If server returns details only, compute summary client-side
+        const details = Array.isArray(data.details) ? data.details : []
+        if (details.length > 0) {
+          total = details.length
+          correct = details.filter((d: any) => !!d?.correct).length
+        }
+
+        // Fallbacks when fields are missing or stringified
+        if (!Number.isFinite(total)) total = answers.length
+        if (!Number.isFinite(correct)) correct = 0
+        if (!Number.isFinite(percent)) {
+          percent = total > 0 ? Math.round((correct / total) * 100) : 0
+        }
+
+        setScorePercent(percent)
+        setCorrectCount(correct)
+        setTotalCount(total)
       } catch (e: any) {
         console.error("result evaluate error:", e)
         setError(e?.message || "Failed to calculate result")
