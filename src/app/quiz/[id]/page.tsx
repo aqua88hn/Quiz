@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { QuestionCard } from "@/components/question-card"
+import { QuestionCard } from "@/components/quiz/question-card"
 import { ProgressBar } from "@/components/progress-bar"
 import { Navigation } from "@/components/navigation"
 import { httpClient } from '@/lib/httpClient'

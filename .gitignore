@@ -44,3 +44,7 @@ Thumbs.db
 # Ignore .bak backups created by agents and .new conflict copies
 *.bak
 *.new
+src/lib/services/quiz-service.txt
+src/lib/datalayer/db-quiz-question.txt 
+src/components/admin/admin-question-card.txt
+src/components/admin/question-form.txt

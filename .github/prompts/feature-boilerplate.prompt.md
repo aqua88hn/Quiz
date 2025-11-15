@@ -14,8 +14,6 @@ description: 'Feature boilerplate: route, service, types, validation (Zod), form
 - After creating or modifying files, list the created/modified file paths and include a short summary (1–2 lines) for each file.
 - If preview is requested, first output a short preview (first ~20 lines) of each file to be created. Only apply changes after explicit confirmation.
 
-## Updated Guidelines for Feature Boilerplate
-
 ### Goal
 Generate full-stack boilerplate for a new resource in this repo.
 
@@ -31,13 +29,12 @@ Generate full-stack boilerplate for a new resource in this repo.
 - Tailwind CSS class standards
 - Reuse components in components/ui where possible
 
-#### API Route
-- Path: `src/app/api/{resource}/route.ts`
-- Use `getPool()` from `db-connection.ts` for all database operations.
-- Ensure all `PUT` and `DELETE` methods validate the presence of `id`.
+#### DataLayer / db-{resource}.ts
+- Path: `src/app/lib/datalayer/db-{resource}.ts`
+- Implement CRUD functions based on specified API methods.
 - Example:
   ```typescript
-  import { getPool } from '@/lib/db-connection';
+  import { getPool } from '@/lib/datalayer/db-connection';
 
   export async function PUT(req: Request) {
     const pool = getPool();
@@ -51,31 +48,50 @@ Generate full-stack boilerplate for a new resource in this repo.
   }
   ```
 
-#### Service
-- Path: `src/lib/services/{resource}.ts`
-- Use `getPool()` for database queries.
-- Ensure all queries use parameterized SQL to prevent SQL Injection.
-- Example:
-  ```typescript
-  import { getPool } from '@/lib/db-connection';
+#### API Admin Route 
+- Path: `src/app/api/v1/{resource}/route.ts`
+- Ensure to use existing DB access layer; if missing, create a small helper under /lib and document it.
+- Example: 
+```typescript
+import { NextResponse, type NextRequest } from "next/server"
+import { asyncWrapper } from "@/lib/middleware/asyncWrapper"
+import { updateQuestion, deleteQuestion } from "@/lib/datalayer/db-quiz-question"
 
-  export async function updateResource(id: string, updates: Partial<{ name: string }>) {
-    const pool = getPool();
-    if (!id) throw new Error('ID is required for updates');
-    const result = await pool.query(
-      `UPDATE {resource} SET name = COALESCE($2, name) WHERE id = $1 RETURNING *`,
-      [id, updates.name || null]
-    );
-    return result.rows[0];
-  }
-  ```
+function extractIds(pathname: string) {
+  const m = pathname.match(/\/quizzes\/([^/]+)\/questions\/([^/]+)$/i)
+  return { quizId: m?.[1], questionId: m?.[2] }
+}
+
+export const PUT = asyncWrapper(async (req: NextRequest) => {
+  const { quizId, questionId } = extractIds(req.nextUrl.pathname)
+  if (!quizId || !questionId) return NextResponse.json({ success: false, error: "Missing ids" }, { status: 400 })
+  const body = await req.json().catch(() => ({}))
+  const updated = await updateQuestion(quizId, questionId, body)
+  if (!updated) return NextResponse.json({ success: false, error: "Question not found" }, { status: 404 })
+  return NextResponse.json({ success: true, data: updated })
+})
+
+export const DELETE = asyncWrapper(async (req: NextRequest) => {
+  const { quizId, questionId } = extractIds(req.nextUrl.pathname)
+  if (!quizId || !questionId) return NextResponse.json({ success: false, error: "Missing ids" }, { status: 400 })
+  const res = await deleteQuestion(quizId, questionId)
+  if (!res.deleted) return NextResponse.json({ success: false, error: "Question not found" }, { status: 404 })
+  return NextResponse.json({ success: true, data: { deleted: true } })
+})
+```
+
+#### Service
+- Path: `src/lib/services/{resource}-service.ts`
+- Implement business logic functions for the resource.
+- Ensure all have a both admin and use case endponint.
+- Use simple code structure suitable for the repo's existing style like existing [services](../../src/lib/services/quiz-service.ts).
 
 #### Types
-- Path: `src/types/{resource}.ts`
+- Path: `src/types/{resource}/{resource}-form.ts`
 - Define TypeScript types for the resource.
 
 #### Validation
-- Path: `src/validation/{resource}.ts`
+- Path: `src/validation/{resource}/{resource}.ts`
 - Use Zod for schema validation.
 - Ensure `id` is validated for `PUT` and `DELETE` methods.
 - Example:
@@ -88,21 +104,29 @@ Generate full-stack boilerplate for a new resource in this repo.
   });
   ```
 
-#### Form
-- Path: `src/components/forms/{FormName}/{FormName}Form.tsx`
-- Use `react-hook-form` with `zodResolver` for validation.
-- Include a hidden `id` field for `PUT` operations.
-- Example:
-  ```typescript
-  <form onSubmit={handleSubmit(onSubmit)}>
-    <input {...register('id')} type="hidden" />
-    <input {...register('name')} />
-  </form>
-  ```
+#### Page Admin ListView
+- Path: `src/app/admin/{resource}/page.tsx`
+- Include a data table view have pageing and lazy loading the resource.
+- Ensure the page is marked with the `"use client"` directive if using `useRouter`.
 
-#### Page
-- Path: `src/app/{resource}/edit/page.tsx`
+#### Page Admin EditView
+- Path: `src/app/admin/{resource}/[id]/page.tsx`
 - Include a form for editing the resource.
+- Ensure the page is marked with the `"use client"` directive if using `useRouter`.
+
+#### Components Admin Card & Form
+##### Card
+- Path: `src/components/admin/admin-{resource}-card.tsx`, `src/components/admin/{resource}-form.tsx`
+- Use same form component structure as existing admin [forms](../../src/components/admin/admin-question-card.tsx).
+- Include a hidden `id` field for `PUT` operations. 
+#### Form
+- Path: `src/components/admin/{resource}-form.tsx`
+- Use same form component structure as existing admin [forms](../../src/components/admin/question-form.tsx).
+- Include a hidden `id` field for `PUT` operations. 
+
+#### Page 
+- Path: `src/app/{resource}/[id]/page.tsx`
+- Include a page for view detail like view card for the resource.
 - Ensure the page is marked with the `"use client"` directive if using `useRouter`.
 
 #### Tests

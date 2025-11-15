@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { QuizCard } from "@/components/quiz-card"
+import { QuizCard } from "@/components/quiz/quiz-card"
 import { getQuizzes } from "@/lib/datalayer/db-quiz-question"
 
 export const dynamic = "force-dynamic"
