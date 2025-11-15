@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { QuestionCard } from "@/components/question-card"
 import { ProgressBar } from "@/components/progress-bar"
 import { Navigation } from "@/components/navigation"
+import { httpClient } from '@/lib/httpClient'
 
 interface Question {
   id: string
@@ -34,13 +35,11 @@ export default function QuizPage() {
     setLoading(true)
     setError(null)
 
-    fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}`)
-      .then((r) => r.json())
-      .then((json) => {
+    ;(async () => {
+      try {
+        const json = await httpClient.getJson<any>(`/api/v1/quizzes/${encodeURIComponent(quizId)}`)
         if (json?.success && json.data) {
-          // Expect API returns { id, title, questions: [...] }
           const data = json.data
-          // Normalize questions/options just in case
           const questions: Question[] = (data.questions || []).map((q: any) => ({
             id: String(q.id),
             question: q.question,
@@ -53,13 +52,14 @@ export default function QuizPage() {
           setError(json?.error || "Quiz not found")
           setQuiz(null)
         }
-      })
-      .catch((e) => {
+      } catch (e) {
         console.error("load quiz error", e)
         setError("Failed to load quiz")
         setQuiz(null)
-      })
-      .finally(() => setLoading(false))
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [quizId])
 
   if (loading) {

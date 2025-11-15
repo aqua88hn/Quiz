@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { httpClient } from '@/lib/httpClient'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -17,21 +18,20 @@ export default function AdminLoginPage() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await httpClient.request('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
-      })
+      }, { retries: 0 })
 
-      const result = await response.json()
+      const result = await res.json()
 
-      if (!response.ok) {
+      if (!res.ok) {
         setError(result.error || "Login failed")
         setLoading(false)
         return
       }
 
-      // Fix: API returns { token, user } -> use result.token
       const token = result?.token
       if (!token) {
         setError("Login failed: missing token")
@@ -39,10 +39,7 @@ export default function AdminLoginPage() {
         return
       }
 
-      // Store token in cookie
       document.cookie = `adminToken=${encodeURIComponent(token)}; path=/; max-age=86400`
-
-      // Redirect to admin dashboard
       router.push("/admin")
     } catch (err) {
       setError("An error occurred during login")

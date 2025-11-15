@@ -17,28 +17,25 @@ export interface QuestionData {
 export interface QuizWithQuestions extends QuizData {
   questions: QuestionData[]
 }
+import { httpClient } from '@/lib/httpClient'
 
 export async function fetchQuizzes(): Promise<QuizData[]> {
-  const response = await fetch("/api/v1/quizzes")
-  if (!response.ok) throw new Error("Failed to fetch quizzes")
-  const { data } = await response.json()
-  return data
+  const json = await httpClient.getJson<{ data: QuizData[] }>('/api/v1/quizzes')
+  return json.data
 }
 
 export async function fetchQuizById(id: string): Promise<QuizWithQuestions> {
-  const response = await fetch(`/api/v1/quizzes/${id}`)
-  if (!response.ok) throw new Error("Failed to fetch quiz")
-  const { data } = await response.json()
-  return data
+  const json = await httpClient.getJson<{ data: QuizWithQuestions }>(`/api/v1/quizzes/${id}`)
+  return json.data
 }
 
 export async function submitQuizAnswers(quizId: string, answers: Array<{ questionId: string; selected: number[] }>) {
-  const response = await fetch(`/api/v1/quizzes/${quizId}/submit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const res = await httpClient.request(`/api/v1/quizzes/${quizId}/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ answers }),
-  })
-  if (!response.ok) throw new Error("Failed to submit answers")
-  const { data } = await response.json()
-  return data
+  }, { retries: 1 })
+
+  const json = await res.json()
+  return json.data
 }

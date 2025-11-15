@@ -39,3 +39,8 @@ yarn-error.log*
 # OS
 Thumbs.db
 .DS_Store
+
+# Backup / temp files created by automation or editors
+# Ignore .bak backups created by agents and .new conflict copies
+*.bak
+*.new

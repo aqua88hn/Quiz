@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { AdminQuestionCard } from "@/components/admin/admin-question-card"
 import { QuestionForm } from "@/components/question-form"
+import { httpClient } from '@/lib/httpClient'
 
 interface Question {
   id: string
@@ -37,9 +38,8 @@ export default function AdminQuizPage() {
     setError(null);
     (async () => {
       try {
-        const res = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}`)
-        const json = await res.json()
-        if (!res.ok || !json?.success) {
+        const json = await httpClient.getJson<any>(`/api/v1/quizzes/${encodeURIComponent(quizId)}`)
+        if (!json?.success) {
           throw new Error(json?.error || "Failed to load quiz")
         }
         const data = json.data
@@ -66,9 +66,9 @@ export default function AdminQuizPage() {
 
   const handleAddQuestion = async (newQuestion: Omit<Question, "id">) => {
     try {
-      const res = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}/questions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await httpClient.request(`/api/v1/quizzes/${encodeURIComponent(quizId)}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newQuestion),
       })
       const json = await res.json()
@@ -97,9 +97,9 @@ export default function AdminQuizPage() {
     const title = window.prompt("Edit title", quiz.title) ?? quiz.title
     const description = window.prompt("Edit description", quiz.description || "") ?? (quiz.description || "")
     try {
-      const res = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      const res = await httpClient.request(`/api/v1/quizzes/${encodeURIComponent(quizId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, description }),
       })
       const json = await res.json()
@@ -113,7 +113,7 @@ export default function AdminQuizPage() {
   const handleDeleteQuiz = async () => {
     if (!confirm("Delete this quiz? All questions will be removed.")) return
     try {
-      const res = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}`, { method: "DELETE" })
+      const res = await httpClient.request(`/api/v1/quizzes/${encodeURIComponent(quizId)}`, { method: 'DELETE' }, { retries: 0 })
       const json = await res.json()
       if (!res.ok || !json?.success) throw new Error(json?.error || "Failed to delete quiz")
       router.push("/admin")
@@ -139,11 +139,11 @@ export default function AdminQuizPage() {
       .map((n) => Number(n))
 
     try {
-      const res = await fetch(
+      const res = await httpClient.request(
         `/api/v1/quizzes/${encodeURIComponent(quizId)}/questions/${encodeURIComponent(q.id)}`,
         {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question, options, answer, explanation, type }),
         },
       )
@@ -159,9 +159,10 @@ export default function AdminQuizPage() {
   const handleDeleteQuestion = async (questionId: string) => {
     if (!confirm("Delete this question?")) return
     try {
-      const res = await fetch(
+      const res = await httpClient.request(
         `/api/v1/quizzes/${encodeURIComponent(quizId)}/questions/${encodeURIComponent(questionId)}`,
-        { method: "DELETE" },
+        { method: 'DELETE' },
+        { retries: 0 },
       )
       const json = await res.json()
       if (!res.ok || !json?.success) throw new Error(json?.error || "Failed to delete question")

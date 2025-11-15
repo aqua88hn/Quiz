@@ -5,6 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { AdminQuizCard } from "@/components/admin/admin-quiz-card"
+import { httpClient } from '@/lib/httpClient'
 
 interface Quiz {
   id: string
@@ -32,9 +33,8 @@ export default function AdminPage() {
       try {
         setLoading(true)
         setError(null)
-        const res = await fetch("/api/v1/quizzes", { cache: "no-store" })
-        const json = await res.json()
-        if (!res.ok || !json?.success) throw new Error(json?.error || "Failed to load quizzes")
+        const json = await httpClient.getJson<any>('/api/v1/quizzes')
+        if (!json?.success) throw new Error(json?.error || "Failed to load quizzes")
 
         const data: any[] = json.data || []
         if (ignore) return
@@ -69,9 +69,9 @@ export default function AdminPage() {
         question_count: Number(newQuiz.questionCount) || 0,
         difficulty: newQuiz.difficulty,
       }
-      const res = await fetch("/api/v1/quizzes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await httpClient.request('/api/v1/quizzes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const json = await res.json()

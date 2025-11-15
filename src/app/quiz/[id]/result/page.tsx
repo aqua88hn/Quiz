@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { httpClient } from '@/lib/httpClient'
 
 interface SubmitAnswer {
   questionId: string
@@ -32,9 +33,9 @@ export default function ResultPage() {
         }
         const answers: SubmitAnswer[] = JSON.parse(stored)
 
-        const res = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}/submit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const res = await httpClient.request(`/api/v1/quizzes/${encodeURIComponent(quizId)}/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           // include quizId for compatibility; server can ignore if not needed
           body: JSON.stringify({ quizId, answers }),
         })

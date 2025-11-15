@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
+import { httpClient } from '@/lib/httpClient'
 
 interface Question {
   id: string
@@ -40,9 +41,8 @@ export default function ReviewPage() {
         setError(null)
 
         // 1) lấy câu hỏi từ API (để hiển thị nội dung + options)
-        const resQuiz = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}`)
-        const jsonQuiz = await resQuiz.json()
-        if (!resQuiz.ok || !jsonQuiz?.success) throw new Error(jsonQuiz?.error || "Failed to load quiz")
+        const jsonQuiz = await httpClient.getJson<any>(`/api/v1/quizzes/${encodeURIComponent(quizId)}`)
+        if (!jsonQuiz?.success) throw new Error(jsonQuiz?.error || "Failed to load quiz")
         const qs: Question[] = (jsonQuiz.data?.questions || []).map((q: any) => ({
           id: String(q.id),
           question: q.question,
@@ -57,9 +57,9 @@ export default function ReviewPage() {
         setAnswers(parsed)
 
         if (parsed.length > 0) {
-          const resSubmit = await fetch(`/api/v1/quizzes/${encodeURIComponent(quizId)}/submit`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+          const resSubmit = await httpClient.request(`/api/v1/quizzes/${encodeURIComponent(quizId)}/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ answers: parsed }),
           })
           const jsonSubmit = await resSubmit.json()
