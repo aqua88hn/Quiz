@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { asyncWrapper } from "@/lib/middleware/asyncWrapper" 
-import { saveCompletedUserSession } from "@/lib/db-quiz-question"
+import { saveCompletedUserSession } from "@/lib/datalayer/db-quiz-question"
 import { getClientIp } from "@/lib/middleware/logger"
 
 function extractQuizId(pathname: string) {

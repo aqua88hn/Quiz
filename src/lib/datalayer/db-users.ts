@@ -1,4 +1,4 @@
-import { getPool } from "@/lib/db-connection"
+import { getPool } from "@/lib/datalayer/db-connection"
 
 // In-memory fallback for demo (when DB unavailable)
 const mockUsers = [

@@ -1,4 +1,4 @@
-import { getUserByUsername, createAuditLog, updateUserLastLogin } from "./db-users"
+import { getUserByUsername, createAuditLog, updateUserLastLogin } from "./datalayer/db-users"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production"
 

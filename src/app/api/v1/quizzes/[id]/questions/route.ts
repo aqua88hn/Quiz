@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { asyncWrapper } from "@/lib/middleware/asyncWrapper"
-import { createQuestionForQuiz } from "@/lib/db-quiz-question"
+import { createQuestionForQuiz } from "@/lib/datalayer/db-quiz-question"
 
 function extractQuizId(pathname: string) {
   const m = pathname.match(/\/quizzes\/([^/]+)\/questions$/i)

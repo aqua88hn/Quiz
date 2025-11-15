@@ -3,7 +3,7 @@ import { validateUserLogin, generateToken } from "@/lib/auth-postgres"
 import { asyncWrapper } from "@/lib/middleware/asyncWrapper"
 import type { RequestContext } from "@/lib/middleware/types"
 import { ValidationError, AuthError } from "@/lib/middleware/types"
-import { createAuditLog } from "@/lib/db-users"
+import { createAuditLog } from "@/lib/datalayer/db-users"
 
 export async function POST(request: Request) {
   try {

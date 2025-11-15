@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { asyncWrapper } from "@/lib/middleware/asyncWrapper"
-import { getAllUsers } from "@/lib/db-users"
+import { getAllUsers } from "@/lib/datalayer/db-users"
 import type { RequestContext } from "@/lib/middleware/types"
 
 async function GET(request: NextRequest, ctx: RequestContext) {

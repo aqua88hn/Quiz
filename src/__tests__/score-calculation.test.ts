@@ -1,4 +1,4 @@
-import { submitAnswers, type Answer } from "@/lib/db-quiz-question"
+import { submitAnswers, type Answer } from "@/lib/datalayer/db-quiz-question"
 
 describe("Score Calculation", () => {
   it("should calculate 100% for all correct single-select answers", () => {

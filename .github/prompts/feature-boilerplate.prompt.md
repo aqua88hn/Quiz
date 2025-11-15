@@ -5,6 +5,15 @@ tools: ['githubRepo', 'search/codebase']
 description: 'Feature boilerplate: route, service, types, validation (Zod), form, page, tests'
 ---
 
+### Action (required)
+- Use the `githubRepo` tool to create and commit the files described below at the specified `Path:` locations in the repository.
+- Commit message: "feat: add {resource} boilerplate"
+- If a target file already exists, follow this conflict policy:
+  - Safe mode (default): Do NOT overwrite. Instead create a new file with suffix `.new` (e.g., `myfile.ts.new`) and report the conflict in the response.
+  - Overwrite mode (opt-in): Back up the existing file by copying it to `<filename>.bak` before overwriting.
+- After creating or modifying files, list the created/modified file paths and include a short summary (1–2 lines) for each file.
+- If preview is requested, first output a short preview (first ~20 lines) of each file to be created. Only apply changes after explicit confirmation.
+
 ## Updated Guidelines for Feature Boilerplate
 
 ### Goal
@@ -17,6 +26,10 @@ Generate full-stack boilerplate for a new resource in this repo.
 - **Form Name**: (PascalCase, e.g., `UserEdit`) if different from the resource name
 
 ### Constraints:
+- TypeScript, use existing db connection getPool() (project-specific)
+- Use Zod for validation
+- Tailwind CSS class standards
+- Reuse components in components/ui where possible
 
 #### API Route
 - Path: `src/app/api/{resource}/route.ts`

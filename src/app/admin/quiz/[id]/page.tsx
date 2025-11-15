@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { AdminQuestionCard } from "@/components/admin-question-card"
+import { AdminQuestionCard } from "@/components/admin/admin-question-card"
 import { QuestionForm } from "@/components/question-form"
 
 interface Question {

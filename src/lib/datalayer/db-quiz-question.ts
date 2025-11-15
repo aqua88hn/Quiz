@@ -1,5 +1,5 @@
 import { error } from "console";
-import { getPool } from "@/lib/db-connection"
+import { getPool } from "@/lib/datalayer/db-connection"
 import { randomUUID } from "crypto"
 import { logger } from '@/lib/middleware/logger'
 

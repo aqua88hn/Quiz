@@ -41,9 +41,20 @@ quizmate/
 │       └── health/              # Health check
 ├── components/                  # Reusable React components
 ├── lib/
-│   ├── db.ts                    # Database layer
-│   ├── auth.ts                  # Authentication utilities
-│   └── quiz-service.ts          # Quiz service layer
+│   ├── datalayer/
+│   │   ├── db-connection.ts     # Database connection
+|   |   └── db-user.ts           # Database layer
+│   ├── middleware/
+│   │   ├── asyncWrapper.ts      # http wrapper
+│   │   ├── authMiddleware.ts    # Authentication middleware
+│   │   ├── errorHandler.ts      # Exception handle to convert to the http message
+│   │   ├── logger.ts            # Implement logger class
+│   │   ├── requestLogger.ts     # Use to log and audit the request
+|   |   └── types.ts             # Define types
+│   ├── services/
+|   |   └── quiz-service.ts       Quiz service layer
+│   ├── auth-posstgres.ts        # Authentication utilities use postgres db
+│   └── httpClient.ts            # Quiz service layer
 ├── __tests__/                   # Test files
 └── middleware.ts                # Next.js middleware
 

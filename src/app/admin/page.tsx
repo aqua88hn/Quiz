@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { AdminQuizCard } from "@/components/admin-quiz-card"
+import { AdminQuizCard } from "@/components/admin/admin-quiz-card"
 
 interface Quiz {
   id: string

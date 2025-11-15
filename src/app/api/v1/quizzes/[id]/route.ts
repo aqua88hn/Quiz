@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getQuizById, getQuestionsByQuizId, updateQuiz, deleteQuiz } from "@/lib/db-quiz-question";
+import { getQuizById, getQuestionsByQuizId, updateQuiz, deleteQuiz } from "@/lib/datalayer/db-quiz-question";
 import { asyncWrapper } from "@/lib/middleware/asyncWrapper";
 
 function extractQuizId(pathname: string) {

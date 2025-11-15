@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getQuizzes, createQuiz } from "@/lib/db-quiz-question";
+import { getQuizzes, createQuiz } from "@/lib/datalayer/db-quiz-question";
 import { asyncWrapper } from "@/lib/middleware/asyncWrapper";
 
 async function handleGET() {
